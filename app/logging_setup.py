@@ -15,7 +15,7 @@ class InMemoryHandler(logging.Handler):
             self.logs.pop(0)
 
 
-# Создаём handler
+# create handler
 memory_handler = InMemoryHandler(capacity=1000)
 
 formatter = logging.Formatter(
@@ -23,10 +23,10 @@ formatter = logging.Formatter(
 )
 memory_handler.setFormatter(formatter)
 
-# Настраиваем root logger
+# set root logger
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-# Важно: не добавлять повторно, если уже добавлен
+# don't add if exists
 if not logger.handlers:
     logger.addHandler(memory_handler)
