@@ -33,3 +33,5 @@ Prototype of a web-platform on Streamlit for analysis and visualization powered 
 - YandexGPT API
 - BeautifulSoup4 / Tavily
 
+## Note
+Folder csv_data contains limited number of datasets due to their large size.
