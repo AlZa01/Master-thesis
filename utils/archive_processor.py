@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Универсальный процессор ZIP-архивов и плоских файлов (CSV/Parquet).
-Максимальная устойчивость к повреждённым и нестандартным ZIP.
+Universal processor for ZIP archives and flat files (CSV/Parquet).
+Maximum resilience against corrupted and non-standard ZIP files.
 """
 import zipfile
 import pandas as pd
@@ -18,14 +18,14 @@ import subprocess
 warnings.filterwarnings('ignore')
 
 # ------------------------------------------------------------
-# 1. Фильтрация macOS-мусора
+# 1. Filter macOS junk files
 # ------------------------------------------------------------
 def filter_macos_files(file_list: List[str]) -> List[str]:
     return [f for f in file_list 
             if not ('__MACOSX' in f or f.startswith('._') or f.startswith('.DS_Store'))]
 
 # ------------------------------------------------------------
-# 2. Автоопределение CSV (разделитель + кодировка)
+# 2. Auto-detect CSV (delimiter + encoding)
 # ------------------------------------------------------------
 def detect_csv_sep_and_encoding(content: bytes) -> Tuple[str, str]:
     encodings = ['utf-8', 'cp1251', 'latin-1', 'utf-16']
@@ -57,13 +57,13 @@ def read_csv_from_stream(stream: BytesIO) -> pd.DataFrame:
         return pd.read_csv(stream, sep=None, engine='python')
 
 # ------------------------------------------------------------
-# 3. Чтение Parquet из потока
+# 3. Read Parquet from stream
 # ------------------------------------------------------------
 def read_parquet_from_stream(stream: BytesIO) -> pd.DataFrame:
     return pd.read_parquet(stream)
 
 # ------------------------------------------------------------
-# 4. Извлечение метаданных из DataFrame
+# 4. Extract metadata from DataFrame
 # ------------------------------------------------------------
 def extract_metadata_from_df(df: pd.DataFrame, source_info: dict) -> dict:
     metadata = {
@@ -110,7 +110,7 @@ def extract_metadata_from_df(df: pd.DataFrame, source_info: dict) -> dict:
     return metadata
 
 # ------------------------------------------------------------
-# 5. Сохранение метаданных в JSON
+# 5. Save metadata to JSON
 # ------------------------------------------------------------
 def save_metadata_to_json(metadata: dict, output_dir: Union[str, Path], base_filename: str) -> Path:
     output_dir = Path(output_dir)
@@ -123,7 +123,7 @@ def save_metadata_to_json(metadata: dict, output_dir: Union[str, Path], base_fil
     return json_path
 
 # ------------------------------------------------------------
-# 6. Вспомогательная функция для обработки списка файлов
+# 6. Helper function to process a list of files
 # ------------------------------------------------------------
 def _process_files(files: List[Path], source_archive_name: str, nested_name: Optional[str],
                    metadata_dir: Optional[Path], output_csv_dir: Optional[Path],
@@ -171,12 +171,12 @@ def _process_files(files: List[Path], source_archive_name: str, nested_name: Opt
             key = f"{nested_name + '/' if nested_name else ''}{f.name}"
             result[key] = metadata if return_metadata_only else df
         except Exception as e:
-            print(f"  ⚠️ Ошибка обработки {f}: {e}")
+            print(f"  ⚠️ Error processing {f}: {e}")
             continue
     return result
 
 # ------------------------------------------------------------
-# 7. Основная функция
+# 7. Main function
 # ------------------------------------------------------------
 def process_nested_archive(
     main_zip_path: Union[str, Path],
@@ -187,16 +187,16 @@ def process_nested_archive(
     return_metadata_only: bool = False
 ) -> Dict[str, Union[pd.DataFrame, dict]]:
     """
-    Универсальная обработка файла:
-    - Если это ZIP (сигнатура PK), пытается открыть стандартным zipfile,
-      при ошибке переходит к внешним распаковщикам.
-    - Если не ZIP, читает как CSV/Parquet.
+    Universal file processing:
+    - If it's a ZIP (PK signature), tries to open with standard zipfile,
+      on error falls back to external unpackers.
+    - If not a ZIP, reads as CSV/Parquet.
     """
     path = Path(main_zip_path)
     if not path.exists():
-        raise FileNotFoundError(f"Файл не найден: {path}")
+        raise FileNotFoundError(f"File not found: {path}")
     
-    # Подготовка папок
+    # Prepare directories
     if metadata_dir:
         metadata_dir = Path(metadata_dir)
         metadata_dir.mkdir(parents=True, exist_ok=True)
@@ -204,7 +204,7 @@ def process_nested_archive(
         output_csv_dir = Path(output_csv_dir)
     
     # --------------------------------------------------------
-    # Проверка сигнатуры
+    # Check file signature
     # --------------------------------------------------------
     with open(path, 'rb') as f:
         header = f.read(4)
@@ -212,19 +212,19 @@ def process_nested_archive(
     is_zip_signature = header.startswith(b'PK')
     
     # --------------------------------------------------------
-    # Если это ZIP, пробуем разные методы
+    # If it's a ZIP, try different methods
     # --------------------------------------------------------
     if is_zip_signature:
-        # Метод 1: стандартный zipfile
+        # Method 1: standard zipfile
         try:
             with zipfile.ZipFile(path, 'r') as zf:
-                # ... код обработки ZIP с вложенными архивами ...
+                # ... ZIP processing code with nested archives ...
                 all_items = zf.namelist()
                 filtered_items = filter_macos_files(all_items)
                 nested_zips = [f for f in filtered_items if f.lower().endswith('.zip')]
                 
                 if nested_zips:
-                    # Есть вложенные ZIP
+                    # Nested ZIPs present
                     result = {}
                     for nested_name in nested_zips:
                         with zf.open(nested_name) as nb:
@@ -264,12 +264,12 @@ def process_nested_archive(
                                                 key = f"{nested_name}/{fname}"
                                                 result[key] = meta if return_metadata_only else df
                             except zipfile.BadZipFile:
-                                print(f"  ⚠️ Вложенный ZIP повреждён: {nested_name}")
+                                print(f"  ⚠️ Corrupted nested ZIP: {nested_name}")
                                 continue
                     if result:
                         return result
                 else:
-                    # Простой ZIP
+                    # Simple ZIP
                     result = {}
                     if prefer_parquet:
                         data_files = [f for f in filtered_items if f.lower().endswith('.parquet')]
@@ -309,11 +309,11 @@ def process_nested_archive(
                             result[key] = meta if return_metadata_only else df
                     return result
         except zipfile.BadZipFile:
-            # Не удалось открыть стандартным zipfile, переходим к альтернативам
+            # Failed to open with standard zipfile, fall back to alternatives
             pass
     
     # --------------------------------------------------------
-    # Метод 2: shutil.unpack_archive
+    # Method 2: shutil.unpack_archive
     # --------------------------------------------------------
     if is_zip_signature:
         try:
@@ -338,7 +338,7 @@ def process_nested_archive(
                 pass
     
     # --------------------------------------------------------
-    # Метод 3: patool
+    # Method 3: patool
     # --------------------------------------------------------
     if is_zip_signature:
         try:
@@ -366,7 +366,7 @@ def process_nested_archive(
                 pass
     
     # --------------------------------------------------------
-    # Метод 4: системный unzip
+    # Method 4: system unzip
     # --------------------------------------------------------
     if is_zip_signature:
         try:
@@ -392,15 +392,15 @@ def process_nested_archive(
                 pass
     
     # --------------------------------------------------------
-    # Если всё ещё не получилось и это ZIP — ошибка
+    # If still unsuccessful and it's a ZIP — error
     # --------------------------------------------------------
     if is_zip_signature:
-        raise ValueError(f"Файл {path.name} имеет ZIP-сигнатуру, но не может быть распакован ни одним методом. Возможно, он повреждён, зашифрован или требует ручной распаковки.")
+        raise ValueError(f"File {path.name} has ZIP signature but could not be unpacked by any method. It may be corrupted, encrypted, or require manual extraction.")
     
     # --------------------------------------------------------
-    # Не ZIP — читаем как плоский файл
+    # Not a ZIP — read as a flat file
     # --------------------------------------------------------
-    # Определяем тип по расширению или содержимому
+    # Determine type by extension or content
     ext = path.suffix.lower()
     if ext == '.parquet':
         df = pd.read_parquet(path)
@@ -410,14 +410,14 @@ def process_nested_archive(
             df = read_csv_from_stream(BytesIO(f.read()))
         ftype = 'csv'
     else:
-        # Проверка на Parquet по сигнатуре
+        # Check for Parquet by signature
         with open(path, 'rb') as f:
             magic = f.read(4)
         if magic.startswith(b'PAR1') or (magic[0:2] == b'PK' and path.name.lower().endswith('.parquet')):
             df = pd.read_parquet(path)
             ftype = 'parquet'
         else:
-            # Пробуем как CSV
+            # Try as CSV
             with open(path, 'rb') as f:
                 df = read_csv_from_stream(BytesIO(f.read()))
             ftype = 'csv'
